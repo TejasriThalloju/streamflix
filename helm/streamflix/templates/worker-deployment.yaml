@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "streamflix.fullname" . }}-worker
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      app: streamflix-worker
+  template:
+    metadata:
+      labels:
+        app: streamflix-worker
+    spec:
+      serviceAccountName: {{ .Values.worker.serviceAccountName }}
+      containers:
+      - name: worker
+        image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef: { name: {{ include "streamflix.fullname" . }}-config }
+        - secretRef: { name: streamflix-app-secret }
+        resources:
+{{ toYaml .Values.worker.resources | indent 10 }}

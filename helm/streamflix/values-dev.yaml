@@ -1,0 +1,10 @@
+api:
+  replicaCount: 1
+web:
+  replicaCount: 1
+worker:
+  replicaCount: 1
+
+ingress:
+  enabled: true
+  scheme: internet-facing

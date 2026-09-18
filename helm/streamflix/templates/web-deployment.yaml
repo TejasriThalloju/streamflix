@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "streamflix.fullname" . }}-web
+spec:
+  replicas: {{ .Values.web.replicaCount }}
+  selector:
+    matchLabels: { app: streamflix-web }
+  template:
+    metadata:
+      labels: { app: streamflix-web }
+    spec:
+      containers:
+      - name: web
+        image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag }}"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+        env:
+        - name: VITE_API_URL
+          value: {{ .Values.config.apiUrl | quote }}
+        resources:
+{{ toYaml .Values.web.resources | indent 10 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamflix-web
+spec:
+  selector: { app: streamflix-web }
+  ports:
+  - port: 80
+    targetPort: 80

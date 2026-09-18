@@ -1,0 +1,9 @@
+api:
+  replicaCount: 3
+web:
+  replicaCount: 3
+worker:
+  replicaCount: 2
+
+ingress:
+  enabled: true
