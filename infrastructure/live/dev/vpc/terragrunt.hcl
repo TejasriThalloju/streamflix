@@ -6,7 +6,16 @@ terraform {
   source = "../../../terraform/modules/vpc"
 }
 
+locals {
+  project     = "streamflix"
+  environment = "dev"
 
+  tags = {
+    Project     = local.project
+    Environment = local.environment
+    ManagedBy   = "Terraform"
+  }
+}
 
 inputs = {
   name               = "streamflix-dev"
@@ -16,5 +25,4 @@ inputs = {
   public_subnets     = ["10.10.101.0/24", "10.10.102.0/24"]
   single_nat_gateway = true
   tags               = local.tags
-
 }
