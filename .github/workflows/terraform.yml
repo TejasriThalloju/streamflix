@@ -43,24 +43,44 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inspect GitHub OIDC claims
+      - name: Debug GitHub OIDC endpoint
         shell: bash
         run: |
           set -e
 
-          echo "Requesting GitHub OIDC token..."
+          echo "Checking OIDC environment variables..."
 
-          TOKEN=$(curl -sS \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
-            | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])')
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "ERROR: ACTIONS_ID_TOKEN_REQUEST_TOKEN is NOT available"
+            exit 1
+          fi
 
-          PAYLOAD=$(echo "$TOKEN" | cut -d '.' -f2 | tr '_-' '/+' | base64 -d 2>/dev/null)
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+            echo "ERROR: ACTIONS_ID_TOKEN_REQUEST_URL is NOT available"
+            exit 1
+          fi
 
-          echo "OIDC claims:"
-          echo "$PAYLOAD" | python3 -m json.tool | grep -E \
-            '"sub"|"aud"|"repository"|"repository_id"|"repository_owner"|"repository_owner_id"|"environment"'
+          echo "OIDC token environment variables are available."
+          echo "Requesting OIDC token..."
 
+          RESPONSE=$(curl -sS \
+            -w '\nHTTP_STATUS:%{http_code}' \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            -H "Accept: application/json" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
+
+          HTTP_STATUS=$(echo "$RESPONSE" | sed -n 's/HTTP_STATUS://p')
+          BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS:/d')
+
+          echo "HTTP status: $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "OIDC request failed."
+            echo "$BODY"
+            exit 1
+          fi
+
+          echo "OIDC token request succeeded."
       # --------------------------------------------------
       # 2. Configure AWS using GitHub OIDC
       # --------------------------------------------------
