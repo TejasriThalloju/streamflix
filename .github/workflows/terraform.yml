@@ -25,6 +25,8 @@ env:
   AWS_REGION: ap-south-1
   TERRAFORM_VERSION: "1.15.8"
   TERRAGRUNT_VERSION: "1.1.5"
+  TF_VAR_password: ${{ secrets.RDS_PASSWORD }}
+
 
 jobs:
   terraform:

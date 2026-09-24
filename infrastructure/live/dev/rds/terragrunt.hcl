@@ -28,6 +28,8 @@ inputs = {
   db_name = "streamflix"
   username = "streamflix"
 
+  password = get_env("TF_VAR_password")
+
   port = 5432
 
   subnet_ids = dependency.vpc.outputs.private_subnets
