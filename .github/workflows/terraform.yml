@@ -1,0 +1,171 @@
+name: StreamFlix Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "infrastructure/**"
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  TERRAFORM_VERSION: "1.15.8"
+  TERRAGRUNT_VERSION: "1.1.5"
+
+jobs:
+  terraform:
+    name: Terraform / Terragrunt Dev
+    runs-on: ubuntu-latest
+
+    environment: dev
+
+    steps:
+
+      # --------------------------------------------------
+      # 1. Checkout
+      # --------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --------------------------------------------------
+      # 2. Configure AWS using GitHub OIDC
+      # --------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # --------------------------------------------------
+      # 3. Verify AWS identity
+      # --------------------------------------------------
+      - name: Verify AWS identity
+        run: |
+          aws sts get-caller-identity
+
+      # --------------------------------------------------
+      # 4. Install Terraform 1.15.8
+      # --------------------------------------------------
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      # --------------------------------------------------
+      # 5. Install Terragrunt 1.1.5
+      # --------------------------------------------------
+      - name: Install Terragrunt
+        shell: bash
+        run: |
+          set -e
+
+          curl -fsSL \
+            -o /tmp/terragrunt \
+            "https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}/terragrunt_linux_amd64"
+
+          chmod +x /tmp/terragrunt
+
+          sudo mv /tmp/terragrunt /usr/local/bin/terragrunt
+
+          echo "Terraform:"
+          terraform version
+
+          echo "Terragrunt:"
+          terragrunt --version
+
+      # --------------------------------------------------
+      # 6. Terraform formatting check
+      # --------------------------------------------------
+      - name: Terraform format check
+        working-directory: infrastructure
+        run: |
+          terraform fmt -check -recursive
+
+      # --------------------------------------------------
+      # 7. Validate Terraform modules
+      # --------------------------------------------------
+      - name: Terraform validate
+        shell: bash
+        run: |
+          set -e
+
+          find infrastructure/terraform/modules \
+            -mindepth 1 \
+            -maxdepth 1 \
+            -type d \
+            | while read module; do
+
+              echo "=========================================="
+              echo "Validating module: $module"
+              echo "=========================================="
+
+              terraform -chdir="$module" init -backend=false
+              terraform -chdir="$module" validate
+
+            done
+
+      # --------------------------------------------------
+      # 8. Terragrunt init
+      # --------------------------------------------------
+      - name: Terragrunt init
+        working-directory: infrastructure/live/dev
+        run: |
+          terragrunt run --all init --non-interactive
+
+      # --------------------------------------------------
+      # 9. Terragrunt plan
+      # --------------------------------------------------
+      - name: Terragrunt plan
+        working-directory: infrastructure/live/dev
+        run: |
+          terragrunt run --all plan --non-interactive
+
+      # --------------------------------------------------
+      # 10. Terragrunt apply
+      # --------------------------------------------------
+      - name: Terragrunt apply
+        if: github.ref == 'refs/heads/main'
+        working-directory: infrastructure/live/dev
+        run: |
+          terragrunt run --all apply \
+            --non-interactive \
+            --auto-approve
+
+      # --------------------------------------------------
+      # 11. Verify AWS resources
+      # --------------------------------------------------
+      - name: Verify infrastructure
+        if: success()
+        shell: bash
+        run: |
+          echo "=========================================="
+          echo "AWS ACCOUNT"
+          echo "=========================================="
+
+          aws sts get-caller-identity
+
+          echo ""
+          echo "=========================================="
+          echo "EKS CLUSTERS"
+          echo "=========================================="
+
+          aws eks list-clusters \
+            --region "$AWS_REGION"
+
+          echo ""
+          echo "Infrastructure deployment completed successfully."
