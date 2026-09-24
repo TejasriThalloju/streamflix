@@ -81,6 +81,35 @@ jobs:
           fi
 
           echo "OIDC token request succeeded."
+
+      - name: Show OIDC subject
+        shell: bash
+        run: |
+          set -e
+
+          RESPONSE=$(curl -sS \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            -H "Accept: application/json" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
+
+          TOKEN=$(echo "$RESPONSE" | python3 -c 'import sys, json; print(json.load(sys.stdin)["value"])')
+
+          python3 - "$TOKEN" <<'PY'
+          import sys, base64, json
+
+          token = sys.argv[1]
+          parts = token.split('.')
+          if len(parts) < 2:
+              print("OIDC token is malformed.")
+              raise SystemExit(1)
+
+          payload = parts[1]
+          payload += '=' * (-len(payload) % 4)
+          claims = json.loads(base64.urlsafe_b64decode(payload.encode()))
+          print("sub =", claims.get("sub"))
+          print("aud =", claims.get("aud"))
+          PY
+
       # --------------------------------------------------
       # 2. Configure AWS using GitHub OIDC
       # --------------------------------------------------
