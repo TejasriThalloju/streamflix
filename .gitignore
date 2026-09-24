@@ -1,0 +1,22 @@
+node_modules
+.env
+dist
+*.log
+
+# Terraform generated files
+**/.terraform/
+**/.terraform.lock.hcl
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Terragrunt cache
+**/.terragrunt-cache/
+
+# Sensitive files
+*.tfvars
+*.tfvars.json
+.env

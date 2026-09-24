@@ -1,0 +1,40 @@
+api:
+  replicaCount: 1
+  image:
+    repository: "501380833508.dkr.ecr.ap-south-1.amazonaws.com/streamflix/api"
+    tag: latest
+
+web:
+  replicaCount: 1
+  image:
+    repository: "501380833508.dkr.ecr.ap-south-1.amazonaws.com/streamflix/web"
+    tag: latest
+
+worker:
+  replicaCount: 1
+  image:
+    repository: "501380833508.dkr.ecr.ap-south-1.amazonaws.com/streamflix/worker"
+    tag: latest
+
+config:
+  apiUrl: "/api"
+  mediaPublicBaseUrl: ""
+  corsOrigin: "*"
+  s3Region: "ap-south-1"
+  s3Bucket: "streamflix-media-tejasri-2026"
+
+serviceAccounts:
+  apiRoleArn: "arn:aws:iam::501380833508:role/streamflix-dev-api"
+  workerRoleArn: "arn:aws:iam::501380833508:role/streamflix-dev-worker"
+
+externalSecrets:
+  enabled: true
+  secretName: "streamflix-dev"
+
+ingress:
+  enabled: true
+  className: alb
+  scheme: internet-facing
+  host: ""
+  certificateArn: ""
+  groupName: streamflix

@@ -1,0 +1,106 @@
+name: StreamFlix Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment
+        required: true
+        default: dev
+        type: choice
+        options: [dev, stage, prod]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  EKS_CLUSTER: streamflix-${{ inputs.environment }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push API
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$REGISTRY/streamflix/api:$TAG" ./apps/api
+          docker push "$REGISTRY/streamflix/api:$TAG"
+
+      - name: Build and push Web
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$REGISTRY/streamflix/web:$TAG" ./apps/web
+          docker push "$REGISTRY/streamflix/web:$TAG"
+
+      - name: Build and push Worker
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$REGISTRY/streamflix/worker:$TAG" ./apps/worker
+          docker push "$REGISTRY/streamflix/worker:$TAG"
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.18.6
+
+      - name: Deploy Helm chart
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+          API_URL: ${{ secrets.API_URL }}
+          MEDIA_PUBLIC_BASE_URL: ${{ secrets.MEDIA_PUBLIC_BASE_URL }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          API_ROLE_ARN: ${{ secrets.API_ROLE_ARN }}
+          WORKER_ROLE_ARN: ${{ secrets.WORKER_ROLE_ARN }}
+        run: |
+          helm upgrade --install streamflix ./helm/streamflix \
+            --namespace streamflix \
+            --create-namespace \
+            -f "./helm/streamflix/values-${{ inputs.environment }}.yaml" \
+            --set api.image.repository="$REGISTRY/streamflix/api" \
+            --set api.image.tag="$TAG" \
+            --set web.image.repository="$REGISTRY/streamflix/web" \
+            --set web.image.tag="$TAG" \
+            --set worker.image.repository="$REGISTRY/streamflix/worker" \
+            --set worker.image.tag="$TAG" \
+            --set config.apiUrl="$API_URL" \
+            --set config.mediaPublicBaseUrl="$MEDIA_PUBLIC_BASE_URL" \
+            --set config.s3Bucket="$S3_BUCKET" \
+            --set serviceAccounts.apiRoleArn="$API_ROLE_ARN" \
+            --set serviceAccounts.workerRoleArn="$WORKER_ROLE_ARN"
+
+      - name: Verify
+        run: |
+          kubectl rollout status deployment/streamflix-streamflix-api -n streamflix --timeout=5m
+          kubectl rollout status deployment/streamflix-streamflix-web -n streamflix --timeout=5m
+          kubectl rollout status deployment/streamflix-streamflix-worker -n streamflix --timeout=5m
+          kubectl get ingress -n streamflix

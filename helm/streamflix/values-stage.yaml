@@ -1,0 +1,6 @@
+api:
+  replicaCount: 2
+web:
+  replicaCount: 2
+worker:
+  replicaCount: 1

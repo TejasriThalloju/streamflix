@@ -1,0 +1,58 @@
+api:
+  replicaCount: 2
+  image:
+    repository: ""
+    tag: latest
+  port: 4000
+  serviceAccountName: streamflix-api
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 768Mi }
+
+web:
+  replicaCount: 2
+  image:
+    repository: ""
+    tag: latest
+  port: 80
+  resources:
+    requests: { cpu: 100m, memory: 64Mi }
+    limits: { cpu: 300m, memory: 256Mi }
+
+worker:
+  replicaCount: 1
+  image:
+    repository: ""
+    tag: latest
+  serviceAccountName: streamflix-worker
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "2", memory: 2Gi }
+
+config:
+  apiUrl: ""
+  mediaPublicBaseUrl: ""
+  corsOrigin: "*"
+  s3Region: ap-south-1
+  s3Bucket: ""
+
+secret:
+  databaseUrl: ""
+  jwtSecret: ""
+  redisUrl: ""
+
+serviceAccounts:
+  apiRoleArn: ""
+  workerRoleArn: ""
+
+externalSecrets:
+  enabled: false
+  secretName: streamflix/dev/app
+
+ingress:
+  enabled: true
+  className: alb
+  scheme: internet-facing
+  host: ""
+  certificateArn: ""
+  groupName: streamflix
