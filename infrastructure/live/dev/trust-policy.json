@@ -10,7 +10,7 @@
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:TejasriThalloju/streamflix:environment:dev"
+          "token.actions.githubusercontent.com:sub": "repo:TejasriThalloju@126483852/streamflix@1375711660:environment:dev"
         }
       }
     }
